@@ -45,17 +45,15 @@ namespace NFC_Tag_Manager
 
         private void SerialPortComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (SerialPortComboBox.SelectedItem is string portName)
+            if (SerialPortComboBox.SelectedItem is string portName && _pn532 != null && _isConnected)
             {
-                DriverTextBlock.Text = "Driver: Serial (UART)";
-                DeviceNameTextBlock.Text = "Device: PN532";
-                ConnectButton.IsEnabled = true;
+                UpdateDeviceInfo();
             }
             else
             {
                 DriverTextBlock.Text = "";
                 DeviceNameTextBlock.Text = "";
-                ConnectButton.IsEnabled = false;
+                ConnectButton.IsEnabled = SerialPortComboBox.SelectedItem != null;
             }
         }
 
@@ -75,9 +73,13 @@ namespace NFC_Tag_Manager
             if (_isConnected)
             {
                 await PerformConnectionTests();
-                ConnectButton.Content = "Disconnect";
-                ReadButton.IsEnabled = true;
-                WriteButton.IsEnabled = true;
+                if (_isConnected) // Check if still connected after tests
+                {
+                    ConnectButton.Content = "Disconnect";
+                    ReadButton.IsEnabled = true;
+                    WriteButton.IsEnabled = true;
+                    await UpdateDeviceInfo();
+                }
             }
             else
             {
@@ -98,15 +100,32 @@ namespace NFC_Tag_Manager
 
         private async Task PerformConnectionTests()
         {
-            byte[] samCmd = _pn532.BuildCustomSamFrame();
-            await _pn532.SendCommand(samCmd, "SAM Config");
+            byte[] samCmd = _pn532.BuildFrame(_pn532.cmdSamConfiguration, _pn532.hostToPn532);
+            await _pn532.SendFrame(samCmd, "SAM Config");
             var (samSuccess, _) = await _pn532.ReadResponse(new byte[] { 0xD5, 0x15 }, "SAM Config");
             UpdateIndicator(AwakeIndicator, samSuccess);
             UpdateIndicator(SamConfigIndicator, samSuccess);
             if (!samSuccess)
             {
                 Log("SAM Config failed. Aborting connection tests.");
+                _isConnected = false; // Mark as disconnected if SAM fails
             }
+        }
+
+        private async Task UpdateDeviceInfo()
+        {
+            if (_pn532 == null || !_isConnected) return;
+
+            // Get firmware version to confirm device name
+            byte[] firmwareCmd = _pn532.BuildFrame(_pn532.cmdGetFirmwareVersion, _pn532.hostToPn532);
+            await _pn532.SendFrame(firmwareCmd, "Get Firmware Version");
+            var (success, response) = await _pn532.ReadResponse(new byte[] { 0xD5, 0x03 }, "Get Firmware Version");
+
+            Dispatcher.Invoke(() =>
+            {
+                DriverTextBlock.Text = _pn532.PortName; // Use port name from Pn532Uart
+                DeviceNameTextBlock.Text = success ? "PN532" : "Unknown Device";
+            });
         }
 
         private void Log(string message)
@@ -134,8 +153,8 @@ namespace NFC_Tag_Manager
 
         private async void ReadButton_Click(object sender, RoutedEventArgs e)
         {
-            byte[] passiveCmd = _pn532.BuildFrame(_pn532.cmdInListPassiveTarget.Concat(new byte[] { 0x01, 0x00 }).ToArray());
-            await _pn532.SendCommand(passiveCmd, "Detect Tag");
+            byte[] passiveCmd = _pn532.BuildFrame(_pn532.cmdInListPassiveTarget.Concat(new byte[] { 0x01, 0x00 }).ToArray(), _pn532.hostToPn532);
+            await _pn532.SendFrame(passiveCmd, "Detect Tag");
             var (detectSuccess, _) = await _pn532.ReadResponse(new byte[] { 0xD5, 0x4B }, "Detect Tag");
             if (!detectSuccess)
             {
@@ -143,8 +162,8 @@ namespace NFC_Tag_Manager
                 return;
             }
 
-            byte[] readCmd = _pn532.BuildFrame(_pn532.cmdInDataExchange.Concat(new byte[] { 0x01, 0x30, 0x04 }).ToArray());
-            await _pn532.SendCommand(readCmd, "Read NDEF");
+            byte[] readCmd = _pn532.BuildFrame(_pn532.cmdInDataExchange.Concat(new byte[] { 0x01, 0x30, 0x04 }).ToArray(), _pn532.hostToPn532);
+            await _pn532.SendFrame(readCmd, "Read NDEF");
             var (readSuccess, _) = await _pn532.ReadResponse(new byte[] { 0xD5, 0x41 }, "Read NDEF");
             if (readSuccess)
             {
@@ -164,9 +183,9 @@ namespace NFC_Tag_Manager
             byte[] textBytes = System.Text.Encoding.UTF8.GetBytes(text);
             byte[] ndefRecord = new byte[] { 0xD1, 0x01, (byte)(textBytes.Length + 3), 0x54, 0x02, 0x65, 0x6E }.Concat(textBytes).ToArray();
             byte[] ndefMessage = new byte[] { 0x00, 0x03, (byte)ndefRecord.Length }.Concat(ndefRecord).Concat(new byte[] { 0xFE }).ToArray();
-            byte[] writeCmd = _pn532.BuildFrame(_pn532.cmdInDataExchange.Concat(new byte[] { 0x01, 0xA0, 0x04 }).Concat(ndefMessage.Take(16)).ToArray());
+            byte[] writeCmd = _pn532.BuildFrame(_pn532.cmdInDataExchange.Concat(new byte[] { 0x01, 0xA0, 0x04 }).Concat(ndefMessage.Take(16)).ToArray(), _pn532.hostToPn532);
 
-            await _pn532.SendCommand(writeCmd, "Write NDEF");
+            await _pn532.SendFrame(writeCmd, "Write NDEF");
             var (writeSuccess, _) = await _pn532.ReadResponse(new byte[] { 0xD5, 0x41 }, "Write NDEF");
             if (writeSuccess)
             {
