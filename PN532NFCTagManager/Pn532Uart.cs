@@ -10,10 +10,10 @@ namespace NFC_Tag_Manager
         private SerialPort _serialPort;
         private readonly byte[] preamble = new byte[] { 0x00, 0x00, 0xFF };
         private readonly byte[] postamble = new byte[] { 0x00 };
-        public readonly byte[] wakeupCmd = new byte[] { 0x55, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        public readonly byte[] wakeupCmd = new byte[] { 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         public readonly byte[] ackFrame = new byte[] { 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00 };
         public readonly byte[] nackFrame = new byte[] { 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00 };
-        public readonly byte[] cmdSamConfiguration = new byte[] { 0x14, 0x01 }; // Simplified to D4 14 01
+        public readonly byte[] cmdSamConfiguration = new byte[] { 0x14, 0x01 };
         public readonly byte[] cmdGetFirmwareVersion = new byte[] { 0x02 };
         public readonly byte[] cmdGetGeneralStatus = new byte[] { 0x04 };
         public readonly byte[] cmdInListPassiveTarget = new byte[] { 0x4A };
@@ -98,23 +98,39 @@ namespace NFC_Tag_Manager
 
             try
             {
-                byte[] buffer = new byte[256];
+                byte[] buffer = new byte[512];
                 int totalBytesRead = 0;
+                bool isNdefRead = expectedPrefix.SequenceEqual(new byte[] { 0xD5, 0x41 });
 
                 await Task.Run(async () =>
                 {
                     try
                     {
-                        totalBytesRead = _serialPort.Read(buffer, 0, buffer.Length);
-                        await Task.Delay(50); // Wait for buffered data
-                        if (_serialPort.BytesToRead > 0)
+                        int attempts = 0;
+                        const int maxAttempts = 20;
+                        while (attempts < maxAttempts)
                         {
-                            totalBytesRead += _serialPort.Read(buffer, totalBytesRead, buffer.Length - totalBytesRead);
+                            if (_serialPort.BytesToRead > 0)
+                            {
+                                int bytesRead = _serialPort.Read(buffer, totalBytesRead, buffer.Length - totalBytesRead);
+                                totalBytesRead += bytesRead;
+                                byte[] currentData = buffer.Take(totalBytesRead).ToArray();
+                                if (isNdefRead && Array.IndexOf(currentData, (byte)0xFE) != -1)
+                                    break;
+                                if (!isNdefRead && totalBytesRead >= expectedPrefix.Length)
+                                    break;
+                            }
+                            await Task.Delay(50);
+                            attempts++;
+                            if (_serialPort.BytesToRead == 0 && totalBytesRead > 0)
+                                break;
                         }
+                        if (attempts >= maxAttempts)
+                            _log($"{commandName}: Full response not received within timeout.");
                     }
                     catch (TimeoutException)
                     {
-                        await Task.Run(() => _log($"{commandName}: Read timeout occurred."));
+                        _log($"{commandName}: Read timeout occurred.");
                     }
                 });
 

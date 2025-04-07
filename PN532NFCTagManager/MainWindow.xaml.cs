@@ -221,15 +221,54 @@ namespace NFC_Tag_Manager
                         {
                             Dispatcher.Invoke(() => WakeupIndicator.Fill = Brushes.Green);
                             await Task.Delay(500, _readCts.Token);
-                            byte[] readCmd = _pn532.BuildFrame(_pn532.cmdInDataExchange.Concat(new byte[] { 0x01, 0x30, 0x04 }).ToArray(), _pn532.hostToPn532);
-                            await _pn532.SendFrame(readCmd, "Read NDEF");
-                            Dispatcher.Invoke(() => CommandIndicator.Fill = Brushes.Blue);
-                            var (readSuccess, readResponse) = await _pn532.ReadResponse(new byte[] { 0xD5, 0x41 }, "Read NDEF");
-                            Log($"Read Response: {BitConverter.ToString(readResponse)}");
-                            if (readSuccess)
+
+                            // Read multiple blocks (4 to 11) to get full NDEF message
+                            byte[] fullNdefData = Array.Empty<byte>();
+                            byte blockNumber = 0x04; // Start at block 4
+                            bool terminatorFound = false;
+                            int totalBytesNeeded = 0;
+
+                            while (blockNumber <= 0x0B) // Read blocks 4-11 (8 blocks for 32 bytes max)
                             {
-                                DisplayTagInfo(detectResponse, readResponse);
+                                byte[] readCmd = _pn532.BuildFrame(_pn532.cmdInDataExchange.Concat(new byte[] { 0x01, 0x30, blockNumber }).ToArray(), _pn532.hostToPn532);
+                                await _pn532.SendFrame(readCmd, $"Read NDEF Block {blockNumber}");
+                                Dispatcher.Invoke(() => CommandIndicator.Fill = Brushes.Blue);
+                                var (readSuccess, readResponse) = await _pn532.ReadResponse(new byte[] { 0xD5, 0x41 }, $"Read NDEF Block {blockNumber}");
+                                Log($"Read Response Block {blockNumber}: {BitConverter.ToString(readResponse ?? Array.Empty<byte>())}");
+
+                                if (readSuccess && readResponse != null)
+                                {
+                                    int ndefStart = readResponse.TakeWhile((b, i) => i < readResponse.Length - 2 && !(readResponse[i] == 0xD5 && readResponse[i + 1] == 0x41)).Count();
+                                    byte[] blockData = readResponse.Skip(ndefStart + 3).Take(4).ToArray(); // Take 4 bytes per block
+                                    if (blockNumber == 0x04)
+                                    {
+                                        fullNdefData = blockData; // First block includes header
+                                        totalBytesNeeded = BitConverter.ToUInt16(new byte[] { blockData[1], blockData[0] }, 0) + 2; // NDEF length + header
+                                    }
+                                    else
+                                    {
+                                        fullNdefData = fullNdefData.Concat(blockData).ToArray(); // Append subsequent blocks
+                                    }
+                                    if (Array.IndexOf(blockData, (byte)0xFE) != -1 || fullNdefData.Length >= totalBytesNeeded)
+                                    {
+                                        terminatorFound = true;
+                                        break;
+                                    }
+                                }
+                                blockNumber++;
+                            }
+
+                            // Process the full NDEF message
+                            if (fullNdefData.Length >= 5) // Minimum NDEF header length + start of payload
+                            {
+                                int payloadLength = fullNdefData[2]; // Payload length from NDEF record
+                                byte[] payload = fullNdefData.Skip(3).Take(payloadLength).ToArray();
+                                DisplayTagInfo(detectResponse, payload);
                                 _isReading = false;
+                            }
+                            else
+                            {
+                                Log("Failed to read valid NDEF message.");
                             }
                         }
                         else
@@ -272,7 +311,22 @@ namespace NFC_Tag_Manager
             }
         }
 
-        private void DisplayTagInfo(byte[] detectResponse, byte[] readResponse)
+        private string DetectCardType(byte sensRes1, byte sensRes2, byte sak, byte uidLength)
+        {
+            string atqa = $"0x{sensRes1:X2}{sensRes2:X2}";
+            string sakStr = $"0x{sak:X2}";
+
+            if (atqa == "0x0044" && sakStr == "0x00" && uidLength == 7)
+                return "NXP - NTAG215";
+            else if (atqa == "0x0044" && sakStr == "0x00" && uidLength == 4)
+                return "NXP - MIFARE Ultralight";
+            else if (atqa == "0x0004" && sakStr == "0x20" && uidLength == 7)
+                return "NXP - MIFARE Classic 1K";
+            else
+                return $"Unknown (ATQA: {atqa}, SAK: {sakStr}, UID Length: {uidLength})";
+        }
+
+        private void DisplayTagInfo(byte[] detectResponse, byte[] payload)
         {
             Dispatcher.Invoke(() =>
             {
@@ -285,31 +339,29 @@ namespace NFC_Tag_Manager
                 byte uidLength = tagData[7];
                 byte[] uid = tagData.Skip(8).Take(uidLength).ToArray();
 
-                int ndefStart = readResponse.TakeWhile((b, i) => i < readResponse.Length - 2 && !(readResponse[i] == 0xD5 && readResponse[i + 1] == 0x41)).Count();
-                byte[] ndefData = readResponse.Skip(ndefStart + 3).ToArray();
                 string textData = "";
-                if (ndefData.Length >= 3 && ndefData[0] == 0xD1 && ndefData[1] == 0x01)
+                string language = "";
+                if (payload.Length >= 3 && payload[1] == 0x54) // Check for TEXT record (0x54)
                 {
-                    int payloadLength = ndefData[2];
-                    byte[] payload = ndefData.Skip(3).Take(payloadLength).ToArray();
-                    string lang = Encoding.UTF8.GetString(payload.Take(2).ToArray());
-                    textData = Encoding.UTF8.GetString(payload.Skip(2).ToArray());
+                    int langLength = payload[0]; // Language code length
+                    language = Encoding.UTF8.GetString(payload.Skip(1).Take(langLength).ToArray()); // Extract language code
+                    textData = Encoding.UTF8.GetString(payload.Skip(1 + langLength).ToArray()); // Extract text after language code
                 }
 
-                string tagType = "NXP - NTAG215";
+                string tagType = DetectCardType(sensRes1, sensRes2, sak, uidLength);
                 string technologies = "NFC Forum Type 2";
                 string serialNumber = BitConverter.ToString(uid).Replace("-", "");
-                string atqa = $"0x{sensRes2:X2}{sensRes1:X2}";
+                string atqa = $"0x{sensRes1:X2}{sensRes2:X2}";
                 string sakStr = $"0x{sak:X2}";
                 string protectionStatus = "Not Protected";
-                int totalBytes = 540;
-                int totalPages = 135;
+                int totalBytes = tagType.Contains("NTAG215") ? 540 : 0;
+                int totalPages = tagType.Contains("NTAG215") ? 135 : 0;
                 string dataFormat = "NFC Forum Type 2";
-                int usedBytes = 30;
+                int usedBytes = textData.Length > 0 ? (textData.Length + language.Length + 5) : 0; // Include header, lang length, and lang code
                 int availableBytes = totalBytes - usedBytes;
-                string sizeInfo = $"{usedBytes}/{totalBytes} bytes ({(usedBytes * 100 / totalBytes)}%)";
+                string sizeInfo = totalBytes > 0 ? $"{usedBytes}/{totalBytes} bytes ({(usedBytes * 100 / totalBytes)}%)" : "Unknown";
                 string isWritable = "Yes";
-                string records = $"Record 1: TEXT (0x54), Data: \"{textData}\", Payload Length: {usedBytes - 4} bytes";
+                string records = textData.Length > 0 ? $"Record 1: TEXT (0x54)\n  Language: \"{language}\"\n  Data: \"{textData}\"\n  Payload Length: {textData.Length} bytes" : "No records";
 
                 TagInfoTextBlock.Text = $@"
 Tag Type: {tagType}
