@@ -13,7 +13,7 @@ namespace NFC_Tag_Manager
         public readonly byte[] wakeupCmd = new byte[] { 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         public readonly byte[] ackFrame = new byte[] { 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00 };
         public readonly byte[] nackFrame = new byte[] { 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00 };
-        public readonly byte[] cmdSamConfiguration = new byte[] { 0x14, 0x01, 0x17, 0x01 };
+        public readonly byte[] cmdSamConfiguration = new byte[] { 0x14, 0x01 }; // Simplified to D4 14 01
         public readonly byte[] cmdGetFirmwareVersion = new byte[] { 0x02 };
         public readonly byte[] cmdGetGeneralStatus = new byte[] { 0x04 };
         public readonly byte[] cmdInListPassiveTarget = new byte[] { 0x4A };
@@ -33,7 +33,7 @@ namespace NFC_Tag_Manager
             _log = logCallback;
         }
 
-        public string PortName => _serialPort?.PortName ?? "Unknown"; // Public property for port name
+        public string PortName => _serialPort?.PortName ?? "Unknown";
 
         public bool Connect()
         {
@@ -123,7 +123,6 @@ namespace NFC_Tag_Manager
                 byte[] response = buffer.Take(totalBytesRead).ToArray();
                 await Task.Run(() => _log($"{commandName} Received: " + BitConverter.ToString(response)));
 
-                // Check for and skip ACK frame
                 int dataStart = 0;
                 if (totalBytesRead >= ackFrame.Length && response.Take(ackFrame.Length).SequenceEqual(ackFrame))
                 {
@@ -133,7 +132,6 @@ namespace NFC_Tag_Manager
                     dataStart = ackFrame.Length;
                 }
 
-                // Check remaining data for expected prefix within the frame
                 byte[] actualResponse = response.Skip(dataStart).ToArray();
                 bool success = actualResponse.Length >= expectedPrefix.Length &&
                                actualResponse.SkipWhile((b, i) => i < actualResponse.Length - expectedPrefix.Length + 1 &&
@@ -153,9 +151,9 @@ namespace NFC_Tag_Manager
         public byte[] BuildFrame(byte[] data, byte[] tfi)
         {
             byte[] tfiAndData = tfi.Concat(data).ToArray();
-            byte len = (byte)(tfiAndData.Length + 1); // +1 for DCS
+            byte len = (byte)(tfiAndData.Length + 1);
             byte lcs = (byte)(0x100 - len);
-            byte dcs = (byte)(0xFF - tfiAndData.Sum(b => b) + 1); // Two's complement
+            byte dcs = (byte)(0xFF - tfiAndData.Sum(b => b) + 1);
             return preamble.Concat(new byte[] { len, lcs }).Concat(tfiAndData).Concat(new byte[] { dcs }).Concat(postamble).ToArray();
         }
     }
