@@ -10,7 +10,7 @@ namespace NFC_Tag_Manager
         private SerialPort _serialPort;
         private readonly byte[] preamble = new byte[] { 0x00, 0x00, 0xFF };
         private readonly byte[] postamble = new byte[] { 0x00 };
-        public readonly byte[] wakeupCmd = new byte[] { 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        public readonly byte[] wakeupCmd = new byte[] { 0x55, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         public readonly byte[] ackFrame = new byte[] { 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00 };
         public readonly byte[] nackFrame = new byte[] { 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00 };
         public readonly byte[] cmdSamConfiguration = new byte[] { 0x14, 0x01 }; // Simplified to D4 14 01
@@ -151,7 +151,7 @@ namespace NFC_Tag_Manager
         public byte[] BuildFrame(byte[] data, byte[] tfi)
         {
             byte[] tfiAndData = tfi.Concat(data).ToArray();
-            byte len = (byte)(tfiAndData.Length + 1);
+            byte len = (byte)(tfiAndData.Length);
             byte lcs = (byte)(0x100 - len);
             byte dcs = (byte)(0xFF - tfiAndData.Sum(b => b) + 1);
             return preamble.Concat(new byte[] { len, lcs }).Concat(tfiAndData).Concat(new byte[] { dcs }).Concat(postamble).ToArray();
