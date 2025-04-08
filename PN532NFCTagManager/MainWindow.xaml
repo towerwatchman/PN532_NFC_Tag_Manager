@@ -5,128 +5,146 @@
         Height="600"
         Width="800">
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="300" />
-            <!-- Right section for Tag Info -->
-        </Grid.ColumnDefinitions>
-        <!-- Left Section: Controls and Indicators -->
-        <StackPanel Grid.Column="0"
-                    Margin="10">
-            <!-- COM Port Selection -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <!-- Top Panel -->
+        <StackPanel Grid.Row="0"
+                    Orientation="Horizontal"
+                    Margin="5">
             <ComboBox x:Name="SerialPortComboBox"
-                      Width="200"
-                      Height="30"
+                      Width="100"
+                      Margin="5"
                       SelectionChanged="SerialPortComboBox_SelectionChanged" />
-            <!-- Connect/Disconnect Button -->
             <Button x:Name="ConnectButton"
                     Content="Connect"
                     Width="100"
-                    Height="30"
-                    Margin="0,10,0,0"
+                    Margin="5"
                     Click="ConnectButton_Click" />
-            <!-- Indicators -->
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,10,0,0">
-                <TextBlock Text="Awake:"
-                           Margin="0,0,5,0" />
-                <Ellipse x:Name="AwakeIndicator"
-                         Width="20"
-                         Height="20"
-                         Fill="Gray"
-                         Margin="0,0,10,0" />
-                <TextBlock Text="SAM Config:"
-                           Margin="0,0,5,0" />
-                <Ellipse x:Name="SamConfigIndicator"
-                         Width="20"
-                         Height="20"
-                         Fill="Gray"
-                         Margin="0,0,10,0" />
-                <TextBlock Text="Firmware:"
-                           Margin="0,0,5,0" />
-                <Ellipse x:Name="FirmwareIndicator"
-                         Width="20"
-                         Height="20"
-                         Fill="Gray"
-                         Margin="0,0,10,0" />
-                <TextBlock Text="Status:"
-                           Margin="0,0,5,0" />
-                <Ellipse x:Name="StatusIndicator"
-                         Width="20"
-                         Height="20"
-                         Fill="Gray"
-                         Margin="0,0,10,0" />
-                <TextBlock Text="Passive Target:"
-                           Margin="0,0,5,0" />
-                <Ellipse x:Name="PassiveTargetIndicator"
-                         Width="20"
-                         Height="20"
-                         Fill="Gray" />
+            <TextBlock x:Name="DeviceNameTextBlock"
+                       Margin="5"
+                       VerticalAlignment="Center" />
+            <TextBlock x:Name="DriverTextBlock"
+                       Margin="5"
+                       VerticalAlignment="Center" />
+        </StackPanel>
+        <!-- Main Content -->
+        <Grid Grid.Row="1"
+              Margin="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <!-- Left Panel: Tag Info and Log -->
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Tag Information"
+                           FontWeight="Bold"
+                           Margin="0,0,0,5" />
+                <TextBox x:Name="TagInfoTextBlock"
+                         Height="200"
+                         IsReadOnly="True"
+                         VerticalScrollBarVisibility="Auto"
+                         Margin="0,0,0,10" />
+                <TextBlock Text="Log"
+                           FontWeight="Bold"
+                           Margin="0,0,0,5" />
+                <TextBox x:Name="LogTextBox"
+                         Height="200"
+                         IsReadOnly="True"
+                         VerticalScrollBarVisibility="Auto" />
             </StackPanel>
-            <!-- New Indicators for Wakeup and Commands -->
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,10,0,0">
-                <TextBlock Text="Wakeup:"
-                           Margin="0,0,5,0" />
-                <Ellipse x:Name="WakeupIndicator"
-                         Width="20"
-                         Height="20"
-                         Fill="Gray"
-                         Margin="0,0,10,0" />
-                <TextBlock Text="Command:"
-                           Margin="0,0,5,0" />
-                <Ellipse x:Name="CommandIndicator"
-                         Width="20"
-                         Height="20"
-                         Fill="Gray" />
+            <!-- Right Panel: Indicators -->
+            <StackPanel Grid.Column="1"
+                        Margin="10,0,0,0">
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,5">
+                    <Ellipse x:Name="AwakeIndicator"
+                             Width="10"
+                             Height="10"
+                             Fill="Gray"
+                             Margin="0,0,5,0" />
+                    <TextBlock Text="Awake" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,5">
+                    <Ellipse x:Name="SamConfigIndicator"
+                             Width="10"
+                             Height="10"
+                             Fill="Gray"
+                             Margin="0,0,5,0" />
+                    <TextBlock Text="SAM Config" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,5">
+                    <Ellipse x:Name="FirmwareIndicator"
+                             Width="10"
+                             Height="10"
+                             Fill="Gray"
+                             Margin="0,0,5,0" />
+                    <TextBlock Text="Firmware" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,5">
+                    <Ellipse x:Name="StatusIndicator"
+                             Width="10"
+                             Height="10"
+                             Fill="Gray"
+                             Margin="0,0,5,0" />
+                    <TextBlock Text="Status" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,5">
+                    <Ellipse x:Name="PassiveTargetIndicator"
+                             Width="10"
+                             Height="10"
+                             Fill="Gray"
+                             Margin="0,0,5,0" />
+                    <TextBlock Text="Passive Target" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,5">
+                    <Ellipse x:Name="WakeupIndicator"
+                             Width="10"
+                             Height="10"
+                             Fill="Gray"
+                             Margin="0,0,5,0" />
+                    <TextBlock Text="Wakeup" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,0,0,5">
+                    <Ellipse x:Name="CommandIndicator"
+                             Width="10"
+                             Height="10"
+                             Fill="Gray"
+                             Margin="0,0,5,0" />
+                    <TextBlock Text="Command" />
+                </StackPanel>
             </StackPanel>
-            <!-- Read and Stop Reading Buttons -->
-            <StackPanel Orientation="Horizontal"
-                        Margin="0,10,0,0">
-                <Button x:Name="ReadButton"
-                        Content="Read"
-                        Width="100"
-                        Height="30"
-                        Click="ReadButton_Click" />
-                <Button x:Name="StopReadingButton"
-                        Content="Stop Reading"
-                        Width="100"
-                        Height="30"
-                        Margin="10,0,0,0"
-                        Visibility="Collapsed" />
-            </StackPanel>
-            <!-- Write Button and TextBox -->
-            <TextBox x:Name="WriteDataTextBox"
-                     Width="200"
-                     Height="30"
-                     Margin="0,10,0,0" />
+        </Grid>
+        <!-- Bottom Panel: Controls -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    Margin="5">
+            <Button x:Name="ReadButton"
+                    Content="Read"
+                    Width="100"
+                    Margin="5"
+                    Click="ReadButton_Click" />
+            <Button x:Name="StopReadingButton"
+                    Content="Stop Reading"
+                    Width="100"
+                    Margin="5"
+                    Click="StopReadingButton_Click" />
             <Button x:Name="WriteButton"
                     Content="Write"
                     Width="100"
-                    Height="30"
-                    Margin="0,10,0,0"
+                    Margin="5"
                     Click="WriteButton_Click" />
-            <!-- Driver and Device Name -->
-            <TextBlock x:Name="DriverTextBlock"
-                       Margin="0,10,0,0" />
-            <TextBlock x:Name="DeviceNameTextBlock"
-                       Margin="0,5,0,0" />
-            <!-- Log Output -->
-            <TextBox x:Name="LogTextBox"
-                     Width="Auto"
-                     Height="200"
-                     Margin="0,10,0,0"
-                     IsReadOnly="True"
-                     VerticalScrollBarVisibility="Auto" />
+            <TextBox x:Name="WriteDataTextBox"
+                     Width="200"
+                     Margin="5" />
         </StackPanel>
-        <!-- Right Section: Tag Information -->
-        <TextBlock x:Name="TagInfoTextBlock"
-                   Grid.Column="1"
-                   Width="280"
-                   Height="Auto"
-                   Margin="10"
-                   TextWrapping="Wrap"
-                   VerticalAlignment="Top"
-                   HorizontalAlignment="Left" />
     </Grid>
 </Window>
